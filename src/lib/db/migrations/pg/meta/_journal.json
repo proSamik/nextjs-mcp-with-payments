@@ -36,6 +36,13 @@
       "when": 1750984910768,
       "tag": "0004_damp_warbird",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1752361391563,
+      "tag": "0005_parallel_demogoblin",
+      "breakpoints": true
     }
   ]
 }

@@ -63,4 +63,37 @@ export const VerificationSchema = pgTable("verification", {
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+export const TaskSchema = pgTable("task", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  title: text("title").notNull(),
+  description: text("description"),
+  isCompleted: boolean("is_completed").default(false).notNull(),
+  quadrant: text("quadrant").notNull(), // "urgent-important", "urgent-not-important", "not-urgent-important", "not-urgent-not-important"
+  priority: integer("priority").notNull().default(0), // for ordering within quadrant
+  timeRequired: text("time_required"), // e.g., "2 hours", "30 minutes"
+  timeBlock: text("time_block"), // e.g., "3-5 PM", "11AM-2PM"
+  difficulty: text("difficulty"), // "easy", "medium", "hard"
+  tags: json("tags").default([]).$type<string[]>(),
+  plannerId: uuid("planner_id")
+    .notNull()
+    .references(() => PlannerSchema.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => UserSchema.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const PlannerSchema = pgTable("planner", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  date: date("date").notNull(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => UserSchema.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
 export type UserEntity = typeof UserSchema.$inferSelect;
+export type TaskEntity = typeof TaskSchema.$inferSelect;
+export type PlannerEntity = typeof PlannerSchema.$inferSelect;

@@ -113,6 +113,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `scripts/clean.ts` - Clean build artifacts
 - `scripts/postinstall.ts` - Post-installation tasks
 
+## Task Planner Feature
+
+### Overview
+Comprehensive 4x4 Eisenhower Matrix task planner with real-time updates:
+- **Quadrant View**: Visual 4x4 grid (Urgent/Important, Urgent/Not Important, etc.)
+- **List View**: Collapsible sections for each quadrant
+- **Drag & Drop**: Move tasks between quadrants and reorder within sections
+- **Real-time Updates**: WebSocket broadcasting for multi-client synchronization
+- **Task Management**: Create, edit, delete with rich metadata (time blocks, difficulty, tags)
+
+### Database Schema
+- **PlannerSchema**: Daily planners linked to users and dates
+- **TaskSchema**: Tasks with quadrant, priority, completion status, and metadata
+- Supports task attributes: title, description, time required, time blocks, difficulty levels, custom tags
+
+### API Endpoints
+- `GET/POST /api/planner` - Fetch/create daily planners
+- `GET/POST /api/tasks` - List/create tasks
+- `PUT/DELETE /api/tasks/[id]` - Update/delete individual tasks
+- `PUT /api/tasks/reorder` - Batch reorder tasks with drag & drop
+
+### Components Structure
+- `PlannerView` - Main container with view switching and date selection
+- `QuadrantView` - 4x4 Eisenhower Matrix layout
+- `ListView` - Collapsible sections for each quadrant
+- `TaskItem` - Individual task component with drag handles and actions
+- `TaskForm` - Modal form for creating/editing tasks
+
+### WebSocket Integration
+- Real-time task updates across multiple clients
+- User-specific and date-specific rooms
+- Broadcasts for task creation, updates, deletion, and reordering
+
+### Key Dependencies
+- `@dnd-kit/*` - Drag and drop functionality
+- `socket.io` - WebSocket real-time updates  
+- `date-fns` - Date formatting and manipulation
+- `framer-motion` - Smooth animations and transitions
+
 ## Package Manager
 - Uses pnpm as primary package manager
 - `onlyBuiltDependencies` specified for Biome, Tailwind, and other native packages
