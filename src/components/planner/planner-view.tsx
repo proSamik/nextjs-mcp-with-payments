@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/popover";
 import { format, startOfDay } from "date-fns";
 import { useTaskWebSocket } from "@/lib/websocket/client";
+import { useTaskActions } from "@/lib/websocket/task-actions";
 import { authClient } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
 
@@ -48,9 +49,13 @@ export function PlannerView({ initialDate = new Date() }: PlannerViewProps) {
   const { joinDateRoom, setTasks: setWebSocketTasks } = useTaskWebSocket(
     session?.user?.id || null,
     (updatedTasks: Task[]) => {
+      console.log("WebSocket tasks updated:", updatedTasks);
       setTasks(updatedTasks);
     },
   );
+
+  // Task actions via WebSocket-aware API calls
+  const taskActions = useTaskActions();
 
   // Format date for API calls - use start of day in local timezone
   const formatDateForAPI = (date: Date) => {
@@ -94,61 +99,36 @@ export function PlannerView({ initialDate = new Date() }: PlannerViewProps) {
     }
   };
 
-  // Handle task creation
+  // Handle task creation via WebSocket
   const handleTaskCreate = async (taskData: Partial<Task>) => {
     if (!planner) return;
 
     try {
-      const response = await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...taskData,
-          plannerId: planner.id,
-          priority: tasks.filter((t) => t.quadrant === taskData.quadrant)
-            .length,
-        }),
+      await taskActions.createTask({
+        ...taskData,
+        plannerId: planner.id,
+        priority: tasks.filter((t) => t.quadrant === taskData.quadrant).length,
+        title: taskData.title!,
+        quadrant: taskData.quadrant!,
       });
-
-      if (response.ok) {
-        const newTask = await response.json();
-        setTasks((prev) => [...prev, newTask]);
-      }
     } catch (error) {
       console.error("Error creating task:", error);
     }
   };
 
-  // Handle task update
+  // Handle task update via WebSocket
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      });
-
-      if (response.ok) {
-        const updatedTask = await response.json();
-        setTasks((prev) =>
-          prev.map((t) => (t.id === taskId ? updatedTask : t)),
-        );
-      }
+      await taskActions.updateTask(taskId, updates);
     } catch (error) {
       console.error("Error updating task:", error);
     }
   };
 
-  // Handle task deletion
+  // Handle task deletion via WebSocket
   const handleTaskDelete = async (taskId: string) => {
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        setTasks((prev) => prev.filter((t) => t.id !== taskId));
-      }
+      await taskActions.deleteTask(taskId);
     } catch (error) {
       console.error("Error deleting task:", error);
     }
