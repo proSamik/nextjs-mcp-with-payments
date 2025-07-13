@@ -5,6 +5,7 @@ import { TaskSchema, PlannerSchema } from "@/lib/db/pg/schema.pg";
 import { eq } from "drizzle-orm";
 import { TaskQuadrant, TaskDifficulty } from "@/types/planner";
 import { broadcastTaskCreated } from "@/lib/websocket/server";
+import { nanoid } from "nanoid";
 
 export async function GET(request: NextRequest) {
   try {
@@ -68,6 +69,7 @@ export async function POST(request: NextRequest) {
     const task = await db
       .insert(TaskSchema)
       .values({
+        nanoId: nanoid(8),
         title,
         description,
         quadrant: quadrant as TaskQuadrant,
