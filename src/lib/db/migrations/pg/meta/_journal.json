@@ -43,6 +43,13 @@
       "when": 1752361391563,
       "tag": "0005_parallel_demogoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1752367538604,
+      "tag": "0006_tricky_firebrand",
+      "breakpoints": true
     }
   ]
 }

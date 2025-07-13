@@ -441,3 +441,139 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Built with ❤️ by [prosamik](https://github.com/prosamik)**
+
+## Using the MCP Server with API Key Authentication
+
+Your MCP server is protected by API key authentication. Every request must include a valid API key in the `Authorization` header as a Bearer token. This ensures that only authenticated users can access and use the MCP tools.
+
+### 1. Obtain an API Key
+
+- Log in to your application.
+- Navigate to the **API Keys** section (usually at `/api-keys`).
+- Create a new API key if you don't have one.
+- **Copy** the API key. Treat it like a password—**do not share it publicly**.
+
+---
+
+### 2. MCP Endpoint
+
+The MCP server is available at:
+
+```
+POST /api/mcp
+```
+
+- Local development: `http://localhost:3000/api/mcp`
+- Production: `https://your-domain.com/api/mcp`
+
+---
+
+### 3. Making Requests
+
+All requests must include your API key in the `Authorization` header:
+
+```
+Authorization: Bearer <YOUR_API_KEY>
+```
+
+#### Example cURL Request
+
+```bash
+curl -X POST https://your-domain.com/api/mcp \
+  -H "Authorization: Bearer <YOUR_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "list_tasks",
+    "params": {
+      "date": "2024-06-20"
+    }
+  }'
+```
+
+- Replace `<YOUR_API_KEY>` with your actual API key.
+- Replace the `method` and `params` as needed for the tool you want to call.
+
+---
+
+### 4. Supported Tools
+
+The MCP server exposes several tools. Example methods include:
+
+- `list_tasks` — List all tasks for a specific date.
+- `create_task` — Create a new task.
+- `edit_task` — Edit an existing task.
+- `delete_task` — Delete a task.
+
+**You do not need to provide your user ID in the request.**  
+The server authenticates you based on your API key and injects your user ID automatically.
+
+---
+
+### 5. API Key Security
+
+- **Never share your API key** in public code, forums, or screenshots.
+- If you suspect your API key is compromised, **revoke it immediately** and generate a new one.
+- You can rotate your API keys at any time from the API Keys section of your app.
+
+For more on API key best practices, see [RapidAPI Docs: API Keys / Key Rotation](https://docs.rapidapi.com/docs/keys-and-key-rotation).
+
+---
+
+### 6. Error Handling
+
+If you make a request without a valid API key, you will receive an error response:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "error": {
+    "code": -32001,
+    "message": "Authentication required: Please provide a valid API key in Authorization header"
+  },
+  "id": null
+}
+```
+
+---
+
+### 7. Integrating with Claude Desktop
+
+You can use Claude Desktop (or any compatible MCP client) with your MCP server. Here’s how:
+
+1. Open Claude Desktop and go to the MCP server configuration.
+2. Set the endpoint URL to your MCP server:
+   - Example: `https://your-domain.com/api/mcp`
+3. In the headers section, add:
+   ```
+   Authorization: Bearer <YOUR_API_KEY>
+   ```
+4. Save the configuration and connect.
+
+**Note:** You can manage and rotate your API keys at `/api-keys` in your app.
+
+Example -
+```
+{
+  "mcpServers": {
+    "my-mcp-server": 
+      "url": "http://localhost:3000/api/mcp",
+      "headers": {
+        "Authorization": "Bearer mcp_e65c7e9633531ce5179161784a46ced09836e5c5426bd853a41bf72be142117a"
+      }
+    }
+  }
+}
+```
+
+---
+
+## Summary
+
+- All requests require an API key in the Authorization header.
+- Never send your user ID directly; it is derived from your API key.
+- Rotate your API key if it is ever exposed.
+- See the `/api-keys` page in your app to manage your keys.
+
+If you have any questions or need help, please contact support or refer to the [RapidAPI API Key documentation](https://docs.rapidapi.com/docs/keys-and-key-rotation).
