@@ -1,0 +1,1 @@
+ALTER TABLE "task" ALTER COLUMN "nano_id" SET NOT NULL;

@@ -65,6 +65,7 @@ export const VerificationSchema = pgTable("verification", {
 });
 export const TaskSchema = pgTable("task", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
+  nanoId: text("nano_id").notNull().unique(), // Short unique public ID for MCP
   title: text("title").notNull(),
   description: text("description"),
   isCompleted: boolean("is_completed").default(false).notNull(),

@@ -8,6 +8,7 @@ export type TaskDifficulty = "easy" | "medium" | "hard";
 
 export type Task = {
   id: string;
+  nanoId: string; // Short unique public ID for MCP
   title: string;
   description?: string;
   isCompleted: boolean;

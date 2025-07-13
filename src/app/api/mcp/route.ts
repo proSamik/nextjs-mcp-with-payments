@@ -3,6 +3,12 @@ import { validateApiKey } from "@/lib/auth/api-key";
 import { pgDb as db } from "@/lib/db/pg/db.pg";
 import { TaskSchema, PlannerSchema } from "@/lib/db/pg/schema.pg";
 import { eq, and } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import {
+  broadcastTaskCreated,
+  broadcastTaskUpdated,
+  broadcastTaskDeleted,
+} from "@/lib/websocket/server";
 
 /**
  * List all tasks for a specific date for the authenticated user.
@@ -12,6 +18,8 @@ async function listTasks(args: { date: string }, userId: string) {
     const { date } = args;
     const tasks = await db
       .select({
+        id: TaskSchema.id,
+        nanoId: TaskSchema.nanoId,
         title: TaskSchema.title,
         description: TaskSchema.description,
         isCompleted: TaskSchema.isCompleted,
@@ -88,6 +96,7 @@ async function createTask(args: any, userId: string) {
     const [newTask] = await db
       .insert(TaskSchema)
       .values({
+        nanoId: nanoid(8),
         title,
         description,
         quadrant,
@@ -100,6 +109,8 @@ async function createTask(args: any, userId: string) {
         userId,
       })
       .returning({
+        id: TaskSchema.id,
+        nanoId: TaskSchema.nanoId,
         title: TaskSchema.title,
         description: TaskSchema.description,
         isCompleted: TaskSchema.isCompleted,
@@ -109,9 +120,18 @@ async function createTask(args: any, userId: string) {
         timeBlock: TaskSchema.timeBlock,
         difficulty: TaskSchema.difficulty,
         tags: TaskSchema.tags,
+        plannerId: TaskSchema.plannerId,
+        userId: TaskSchema.userId,
         createdAt: TaskSchema.createdAt,
         updatedAt: TaskSchema.updatedAt,
       });
+
+    // Broadcast task creation to WebSocket clients
+    try {
+      broadcastTaskCreated(newTask as any, date, userId);
+    } catch (error) {
+      console.warn("Failed to broadcast task creation:", error);
+    }
 
     return {
       content: [
@@ -139,27 +159,20 @@ async function createTask(args: any, userId: string) {
  */
 async function editTask(args: any, userId: string) {
   try {
-    const { date, title, updates } = args;
+    const { nanoId, updates } = args;
 
-    // Find the task by title and date
+    // Find the task by nanoId
     const [task] = await db
       .select({
         id: TaskSchema.id,
-        title: TaskSchema.title,
+        nanoId: TaskSchema.nanoId,
       })
       .from(TaskSchema)
-      .innerJoin(PlannerSchema, eq(TaskSchema.plannerId, PlannerSchema.id))
-      .where(
-        and(
-          eq(TaskSchema.userId, userId),
-          eq(PlannerSchema.date, date),
-          eq(TaskSchema.title, title),
-        ),
-      )
+      .where(and(eq(TaskSchema.userId, userId), eq(TaskSchema.nanoId, nanoId)))
       .limit(1);
 
     if (!task) {
-      throw new Error(`Task with title "${title}" not found for date ${date}`);
+      throw new Error(`Task with nanoId "${nanoId}" not found`);
     }
 
     const [updatedTask] = await db
@@ -167,6 +180,8 @@ async function editTask(args: any, userId: string) {
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(TaskSchema.id, task.id))
       .returning({
+        id: TaskSchema.id,
+        nanoId: TaskSchema.nanoId,
         title: TaskSchema.title,
         description: TaskSchema.description,
         isCompleted: TaskSchema.isCompleted,
@@ -176,14 +191,33 @@ async function editTask(args: any, userId: string) {
         timeBlock: TaskSchema.timeBlock,
         difficulty: TaskSchema.difficulty,
         tags: TaskSchema.tags,
+        plannerId: TaskSchema.plannerId,
+        userId: TaskSchema.userId,
+        createdAt: TaskSchema.createdAt,
         updatedAt: TaskSchema.updatedAt,
       });
+
+    // Get the date for broadcasting by finding the planner
+    const [plannerInfo] = await db
+      .select({ date: PlannerSchema.date })
+      .from(PlannerSchema)
+      .where(eq(PlannerSchema.id, updatedTask.plannerId))
+      .limit(1);
+
+    // Broadcast task update to WebSocket clients
+    try {
+      if (plannerInfo) {
+        broadcastTaskUpdated(updatedTask as any, plannerInfo.date, userId);
+      }
+    } catch (error) {
+      console.warn("Failed to broadcast task update:", error);
+    }
 
     return {
       content: [
         {
           type: "text",
-          text: `Task "${title}" updated successfully!\n\n${JSON.stringify(updatedTask, null, 2)}`,
+          text: `Task "${nanoId}" updated successfully!\n\n${JSON.stringify(updatedTask, null, 2)}`,
         },
       ],
     };
@@ -205,36 +239,46 @@ async function editTask(args: any, userId: string) {
  */
 async function deleteTask(args: any, userId: string) {
   try {
-    const { date, title } = args;
+    const { nanoId } = args;
 
-    // Find the task by title and date
+    // Find the task by nanoId
     const [task] = await db
       .select({
         id: TaskSchema.id,
-        title: TaskSchema.title,
+        nanoId: TaskSchema.nanoId,
       })
       .from(TaskSchema)
-      .innerJoin(PlannerSchema, eq(TaskSchema.plannerId, PlannerSchema.id))
-      .where(
-        and(
-          eq(TaskSchema.userId, userId),
-          eq(PlannerSchema.date, date),
-          eq(TaskSchema.title, title),
-        ),
-      )
+      .where(and(eq(TaskSchema.userId, userId), eq(TaskSchema.nanoId, nanoId)))
       .limit(1);
 
     if (!task) {
-      throw new Error(`Task with title "${title}" not found for date ${date}`);
+      throw new Error(`Task with nanoId "${nanoId}" not found`);
     }
 
+    // Get planner info before deleting for broadcasting
+    const [plannerInfo] = await db
+      .select({ date: PlannerSchema.date })
+      .from(TaskSchema)
+      .innerJoin(PlannerSchema, eq(TaskSchema.plannerId, PlannerSchema.id))
+      .where(eq(TaskSchema.id, task.id))
+      .limit(1);
+
     await db.delete(TaskSchema).where(eq(TaskSchema.id, task.id));
+
+    // Broadcast task deletion to WebSocket clients
+    try {
+      if (plannerInfo) {
+        broadcastTaskDeleted(task.id, plannerInfo.date, userId);
+      }
+    } catch (error) {
+      console.warn("Failed to broadcast task deletion:", error);
+    }
 
     return {
       content: [
         {
           type: "text",
-          text: `Task "${title}" deleted successfully!`,
+          text: `Task "${nanoId}" deleted successfully!`,
         },
       ],
     };
@@ -256,27 +300,20 @@ async function deleteTask(args: any, userId: string) {
  */
 async function markTaskComplete(args: any, userId: string) {
   try {
-    const { date, title, completed = true } = args;
+    const { nanoId, completed = true } = args;
 
-    // Find the task by title and date
+    // Find the task by nanoId
     const [task] = await db
       .select({
         id: TaskSchema.id,
-        title: TaskSchema.title,
+        nanoId: TaskSchema.nanoId,
       })
       .from(TaskSchema)
-      .innerJoin(PlannerSchema, eq(TaskSchema.plannerId, PlannerSchema.id))
-      .where(
-        and(
-          eq(TaskSchema.userId, userId),
-          eq(PlannerSchema.date, date),
-          eq(TaskSchema.title, title),
-        ),
-      )
+      .where(and(eq(TaskSchema.userId, userId), eq(TaskSchema.nanoId, nanoId)))
       .limit(1);
 
     if (!task) {
-      throw new Error(`Task with title "${title}" not found for date ${date}`);
+      throw new Error(`Task with nanoId "${nanoId}" not found`);
     }
 
     const [updatedTask] = await db
@@ -287,16 +324,44 @@ async function markTaskComplete(args: any, userId: string) {
       })
       .where(eq(TaskSchema.id, task.id))
       .returning({
+        id: TaskSchema.id,
+        nanoId: TaskSchema.nanoId,
         title: TaskSchema.title,
+        description: TaskSchema.description,
         isCompleted: TaskSchema.isCompleted,
+        quadrant: TaskSchema.quadrant,
+        priority: TaskSchema.priority,
+        timeRequired: TaskSchema.timeRequired,
+        timeBlock: TaskSchema.timeBlock,
+        difficulty: TaskSchema.difficulty,
+        tags: TaskSchema.tags,
+        plannerId: TaskSchema.plannerId,
+        userId: TaskSchema.userId,
+        createdAt: TaskSchema.createdAt,
         updatedAt: TaskSchema.updatedAt,
       });
+
+    // Get the date for broadcasting by finding the planner
+    const [plannerInfo] = await db
+      .select({ date: PlannerSchema.date })
+      .from(PlannerSchema)
+      .where(eq(PlannerSchema.id, updatedTask.plannerId))
+      .limit(1);
+
+    // Broadcast task update to WebSocket clients
+    try {
+      if (plannerInfo) {
+        broadcastTaskUpdated(updatedTask as any, plannerInfo.date, userId);
+      }
+    } catch (error) {
+      console.warn("Failed to broadcast task update:", error);
+    }
 
     return {
       content: [
         {
           type: "text",
-          text: `Task "${title}" marked as ${completed ? "completed" : "incomplete"} successfully!\n\n${JSON.stringify(updatedTask, null, 2)}`,
+          text: `Task "${nanoId}" marked as ${completed ? "completed" : "incomplete"} successfully!\n\n${JSON.stringify(updatedTask, null, 2)}`,
         },
       ],
     };
@@ -460,17 +525,13 @@ export async function POST(request: NextRequest) {
               {
                 name: "edit_task",
                 description:
-                  "Edit an existing task by title and date (authenticated user)",
+                  "Edit an existing task by nanoId (authenticated user)",
                 inputSchema: {
                   type: "object",
                   properties: {
-                    date: {
+                    nanoId: {
                       type: "string",
-                      description: "Date in YYYY-MM-DD format",
-                    },
-                    title: {
-                      type: "string",
-                      description: "Title of the task to edit",
+                      description: "Unique nanoId of the task to edit",
                     },
                     updates: {
                       type: "object",
@@ -498,42 +559,34 @@ export async function POST(request: NextRequest) {
                       description: "Fields to update",
                     },
                   },
-                  required: ["date", "title", "updates"],
+                  required: ["nanoId", "updates"],
                 },
               },
               {
                 name: "delete_task",
-                description:
-                  "Delete a task by title and date (authenticated user)",
+                description: "Delete a task by nanoId (authenticated user)",
                 inputSchema: {
                   type: "object",
                   properties: {
-                    date: {
+                    nanoId: {
                       type: "string",
-                      description: "Date in YYYY-MM-DD format",
-                    },
-                    title: {
-                      type: "string",
-                      description: "Title of the task to delete",
+                      description: "Unique nanoId of the task to delete",
                     },
                   },
-                  required: ["date", "title"],
+                  required: ["nanoId"],
                 },
               },
               {
                 name: "mark_task_complete",
                 description:
-                  "Mark a task as completed by finding it by title and date (authenticated user)",
+                  "Mark a task as completed by nanoId (authenticated user)",
                 inputSchema: {
                   type: "object",
                   properties: {
-                    date: {
+                    nanoId: {
                       type: "string",
-                      description: "Date in YYYY-MM-DD format",
-                    },
-                    title: {
-                      type: "string",
-                      description: "Title of the task to mark as complete",
+                      description:
+                        "Unique nanoId of the task to mark as complete",
                     },
                     completed: {
                       type: "boolean",
@@ -541,7 +594,7 @@ export async function POST(request: NextRequest) {
                       default: true,
                     },
                   },
-                  required: ["date", "title"],
+                  required: ["nanoId"],
                 },
               },
             ],

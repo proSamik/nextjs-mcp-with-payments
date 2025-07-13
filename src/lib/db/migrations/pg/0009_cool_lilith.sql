@@ -1,0 +1,1 @@
+ALTER TABLE "task" ADD CONSTRAINT "task_nano_id_unique" UNIQUE("nano_id");
