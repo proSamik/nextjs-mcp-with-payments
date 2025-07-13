@@ -1,4 +1,4 @@
-# GrabLink - Lead Magnet SaaS Kit
+# TaskFlow - Eisenhower Matrix Planner
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/cgoinglove/nextjs-polar-starter-kit&env=BETTER_AUTH_SECRET&env=POLAR_ACCESS_TOKEN&envDescription=Learn+more+about+how+to+get+the+API+Keys+for+the+application&envLink=https://github.com/cgoinglove/nextjs-polar-starter-kit/blob/main/.env.example&demo-title=GrabLink+Lead+Magnet+Kit&demo-description=Production-ready+Next.js+starter+for+lead+magnets+with+Polar.sh+payments+and+Better+Auth.&products=[{"type":"integration","protocol":"storage","productSlug":"neon","integrationSlug":"neon"}])
 
