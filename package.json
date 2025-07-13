@@ -7,9 +7,10 @@
   "type": "module",
   "description": "A powerful Next.js starter kit featuring Polar.sh for payments, Better Auth for authentication, and Postgres with Drizzle ORM. Build modern web applications with ease.",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "tsx src/server.ts",
+    "dev:turbo": "next dev --turbopack",
     "build": "next build",
-    "start": "next start",
+    "start": "tsx src/server.ts",
     "build:local": "cross-env NO_HTTPS='1' next build",
     "test": "vitest run",
     "test:watch": "vitest",
