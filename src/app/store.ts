@@ -96,6 +96,17 @@ const defaultUIState: UIState = {
 };
 
 /**
+ * Generate unique storage key based on port to prevent localStorage collision between instances
+ */
+const getStorageKey = () => {
+  if (typeof window !== "undefined") {
+    const port = window.location.port || "3000";
+    return `polar-saas-kit-store-mcp-${port}`;
+  }
+  return "polar-saas-kit-store-mcp-3000";
+};
+
+/**
  * Main Zustand store with persistence for user preferences
  */
 export const useAppStore = create<AppState>()(
@@ -242,7 +253,7 @@ export const useAppStore = create<AppState>()(
         },
       }),
       {
-        name: "polar-saas-kit-store",
+        name: getStorageKey(),
         // Only persist user preferences, not UI state
         partialize: (state) => ({
           user: state.user,
@@ -253,7 +264,7 @@ export const useAppStore = create<AppState>()(
       },
     ),
     {
-      name: "polar-saas-kit",
+      name: getStorageKey(),
     },
   ),
 );
