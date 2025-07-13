@@ -32,7 +32,7 @@ export type Planner = {
   updatedAt: Date;
 };
 
-export type ViewMode = "quadrant" | "list";
+export type ViewMode = "quadrant" | "list" | "text";
 
 export type QuadrantConfig = {
   key: TaskQuadrant;
@@ -46,25 +46,28 @@ export const QUADRANTS: QuadrantConfig[] = [
     key: "urgent-important",
     title: "Do",
     subtitle: "Urgent & Important",
-    color: "bg-destructive/10 border-destructive/20",
+    color:
+      "bg-background/60 backdrop-blur-xl border-red-200 shadow-lg shadow-red-100/20 dark:bg-background/60 dark:border-red-800 dark:shadow-red-900/10",
   },
   {
     key: "urgent-not-important",
     title: "Delegate",
     subtitle: "Urgent & Not Important",
     color:
-      "bg-orange-100 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800/30",
+      "bg-background/60 backdrop-blur-xl border-amber-200 shadow-lg shadow-amber-100/20 dark:bg-background/60 dark:border-amber-800 dark:shadow-amber-900/10",
   },
   {
     key: "not-urgent-important",
     title: "Schedule",
     subtitle: "Not Urgent & Important",
-    color: "bg-primary/10 border-primary/20",
+    color:
+      "bg-background/60 backdrop-blur-xl border-blue-200 shadow-lg shadow-blue-100/20 dark:bg-background/60 dark:border-blue-800 dark:shadow-blue-900/10",
   },
   {
     key: "not-urgent-not-important",
     title: "Eliminate",
     subtitle: "Not Urgent & Not Important",
-    color: "bg-muted/50 border-border",
+    color:
+      "bg-background/60 backdrop-blur-xl border-slate-200 shadow-lg shadow-slate-100/20 dark:bg-background/60 dark:border-slate-800 dark:shadow-slate-900/10",
   },
 ];

@@ -16,19 +16,44 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { useDroppable } from "@dnd-kit/core";
 import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
 import { Task, TaskQuadrant, QUADRANTS } from "@/types/planner";
 import { TaskItem } from "./task-item";
+import { InlineTaskForm } from "./inline-task-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+
+function DroppableContainer({
+  quadrant,
+  children,
+}: {
+  quadrant: TaskQuadrant;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef } = useDroppable({
+    id: quadrant,
+    data: { quadrant },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className="space-y-3 min-h-[200px]"
+      data-quadrant={quadrant}
+    >
+      {children}
+    </div>
+  );
+}
 
 interface QuadrantViewProps {
   tasks: Task[];
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => void;
   onTaskDelete: (taskId: string) => void;
-  onTaskCreate: (quadrant: TaskQuadrant) => void;
+  onTaskCreate: (taskData: Partial<Task>) => void;
   onTaskEdit: (task: Task) => void;
 }
 
@@ -37,9 +62,12 @@ export function QuadrantView({
   onTaskUpdate,
   onTaskDelete,
   onTaskCreate,
-  onTaskEdit,
 }: QuadrantViewProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [showingFormFor, setShowingFormFor] = useState<TaskQuadrant | null>(
+    null,
+  );
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -111,6 +139,31 @@ export function QuadrantView({
       .sort((a, b) => a.priority - b.priority);
   };
 
+  const handleCreateTask = (quadrant: TaskQuadrant) => {
+    setShowingFormFor(quadrant);
+    setEditingTask(null);
+  };
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setShowingFormFor(null);
+  };
+
+  const handleFormSubmit = (taskData: Partial<Task>) => {
+    if (editingTask) {
+      onTaskUpdate(editingTask.id, taskData);
+      setEditingTask(null);
+    } else {
+      onTaskCreate(taskData);
+      setShowingFormFor(null);
+    }
+  };
+
+  const handleFormCancel = () => {
+    setShowingFormFor(null);
+    setEditingTask(null);
+  };
+
   return (
     <DndContext
       sensors={sensors}
@@ -119,7 +172,7 @@ export function QuadrantView({
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full max-w-7xl mx-auto">
         {QUADRANTS.map((quadrant) => {
           const quadrantTasks = getTasksByQuadrant(quadrant.key);
 
@@ -130,6 +183,7 @@ export function QuadrantView({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.2 }}
+              className="max-w-2xl"
             >
               <Card
                 className={cn(
@@ -144,20 +198,20 @@ export function QuadrantView({
                       <CardTitle className="text-lg font-semibold">
                         {quadrant.title}
                       </CardTitle>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-muted-foreground">
                         {quadrant.subtitle}
                       </p>
                     </div>
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => onTaskCreate(quadrant.key)}
+                      onClick={() => handleCreateTask(quadrant.key)}
                       className="h-8 w-8 p-0"
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="text-xs text-muted-foreground font-medium">
                     {quadrantTasks.length} tasks
                   </div>
                 </CardHeader>
@@ -167,36 +221,53 @@ export function QuadrantView({
                     items={quadrantTasks.map((task) => task.id)}
                     strategy={verticalListSortingStrategy}
                   >
-                    <div
-                      className="space-y-3 min-h-[200px]"
-                      data-quadrant={quadrant.key}
-                    >
-                      {quadrantTasks.map((task) => (
-                        <TaskItem
-                          key={task.id}
-                          task={task}
-                          onToggleComplete={handleToggleComplete}
-                          onEdit={onTaskEdit}
-                          onDelete={onTaskDelete}
-                        />
-                      ))}
-
-                      {quadrantTasks.length === 0 && (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                          <div className="text-gray-400 dark:text-gray-600 mb-2">
-                            No tasks yet
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onTaskCreate(quadrant.key)}
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Task
-                          </Button>
-                        </div>
+                    <DroppableContainer quadrant={quadrant.key}>
+                      {quadrantTasks.map((task) =>
+                        editingTask?.id === task.id ? (
+                          <InlineTaskForm
+                            key={`edit-${task.id}`}
+                            task={task}
+                            quadrant={quadrant.key}
+                            onSubmit={handleFormSubmit}
+                            onCancel={handleFormCancel}
+                            isEditing={true}
+                          />
+                        ) : (
+                          <TaskItem
+                            key={task.id}
+                            task={task}
+                            onToggleComplete={handleToggleComplete}
+                            onEdit={handleEditTask}
+                            onDelete={onTaskDelete}
+                          />
+                        ),
                       )}
-                    </div>
+
+                      {showingFormFor === quadrant.key && (
+                        <InlineTaskForm
+                          quadrant={quadrant.key}
+                          onSubmit={handleFormSubmit}
+                          onCancel={handleFormCancel}
+                        />
+                      )}
+
+                      {quadrantTasks.length === 0 &&
+                        showingFormFor !== quadrant.key && (
+                          <div className="flex flex-col items-center justify-center py-12 text-center">
+                            <div className="text-muted-foreground mb-2">
+                              No tasks yet
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCreateTask(quadrant.key)}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Task
+                            </Button>
+                          </div>
+                        )}
+                    </DroppableContainer>
                   </SortableContext>
                 </CardContent>
               </Card>

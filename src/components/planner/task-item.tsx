@@ -33,10 +33,10 @@ interface TaskItemProps {
 }
 
 const difficultyColors = {
-  easy: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400",
+  easy: "bg-emerald-500/20 text-emerald-700 border border-emerald-200/50 backdrop-blur-sm dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-800/30",
   medium:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400",
-  hard: "bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive",
+    "bg-amber-500/20 text-amber-700 border border-amber-200/50 backdrop-blur-sm dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-800/30",
+  hard: "bg-red-500/20 text-red-700 border border-red-200/50 backdrop-blur-sm dark:bg-red-500/10 dark:text-red-400 dark:border-red-800/30",
 };
 
 export function TaskItem({
@@ -79,10 +79,12 @@ export function TaskItem({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       className={cn(
-        "group relative bg-card rounded-lg border border-border p-3 shadow-sm transition-all duration-200",
-        isTaskDragging && "opacity-50 rotate-1 scale-105 z-50",
-        task.isCompleted && "opacity-75",
+        "group relative bg-white/60 backdrop-blur-sm rounded-lg border border-white/20 p-3 shadow-lg shadow-black/5 transition-all duration-200 cursor-pointer hover:bg-white/80 hover:shadow-xl hover:shadow-black/10 dark:bg-white/10 dark:border-white/10 dark:hover:bg-white/20",
+        isTaskDragging &&
+          "opacity-50 rotate-1 scale-105 z-50 bg-white/90 dark:bg-white/30",
+        task.isCompleted && "opacity-60 bg-slate-100/60 dark:bg-slate-800/60",
       )}
+      onDoubleClick={() => onEdit(task)}
     >
       {/* Drag Handle */}
       <div
