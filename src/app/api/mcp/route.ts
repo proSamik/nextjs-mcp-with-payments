@@ -625,7 +625,8 @@ export async function POST(request: NextRequest) {
                         "not-urgent-important",
                         "not-urgent-not-important",
                       ],
-                      description: "Task quadrant in Eisenhower Matrix",
+                      description:
+                        "Task quadrant in Eisenhower Matrix, so take user's request carefully and evaluate, user can refer to Do, Delegate, Schedule or Eliminate also which we convert to enums of urgent-important, urgent-not-important, not-urgent-important, not-urgent-not-important, respectively",
                     },
                     priority: {
                       type: "number",
