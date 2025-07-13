@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { Task } from "@/types/planner";
 
@@ -16,61 +16,101 @@ export function useWebSocket(
   events: WebSocketEvents = {},
 ) {
   const socketRef = useRef<Socket | null>(null);
+  const currentDateRoomRef = useRef<string | null>(null);
+  const eventsRef = useRef(events);
+
+  // Update events ref when events change (but don't reconnect)
+  eventsRef.current = events;
 
   useEffect(() => {
     if (!userId) return;
 
-    // Initialize socket connection
-    const socket = io(
-      process.env.NODE_ENV === "production"
-        ? process.env.NEXT_PUBLIC_BETTER_AUTH_URL || ""
-        : "http://localhost:3000",
-      {
-        transports: ["websocket", "polling"],
-      },
-    );
+    // Only create socket if it doesn't exist
+    if (!socketRef.current) {
+      console.log("Creating new WebSocket connection for user:", userId);
 
-    socketRef.current = socket;
+      const socket = io(
+        process.env.NODE_ENV === "production"
+          ? process.env.NEXT_PUBLIC_BETTER_AUTH_URL || ""
+          : "http://localhost:3000",
+        {
+          transports: ["websocket", "polling"],
+        },
+      );
 
-    // Join user room
-    socket.emit("join-user-room", userId);
+      socketRef.current = socket;
 
-    // Set up event listeners
-    if (events.onTaskCreated) {
-      socket.on("task:created", events.onTaskCreated);
+      // Join user room
+      socket.emit("join-user-room", userId);
+
+      // Set up event listeners using refs to avoid recreation
+      socket.on("task:created", (task: Task) => {
+        console.log("WebSocket: Task created", task);
+        eventsRef.current.onTaskCreated?.(task);
+      });
+
+      socket.on("task:updated", (task: Task) => {
+        console.log("WebSocket: Task updated", task);
+        eventsRef.current.onTaskUpdated?.(task);
+      });
+
+      socket.on("task:deleted", (data: { taskId: string }) => {
+        console.log("WebSocket: Task deleted", data);
+        eventsRef.current.onTaskDeleted?.(data);
+      });
+
+      socket.on("tasks:reordered", (tasks: Task[]) => {
+        console.log("WebSocket: Tasks reordered", tasks);
+        eventsRef.current.onTasksReordered?.(tasks);
+      });
+
+      socket.on("auth-error", (message: string) => {
+        console.error("WebSocket authentication error:", message);
+      });
+
+      socket.on("connect", () => {
+        console.log("Connected to WebSocket server");
+        // Rejoin user room on reconnection
+        socket.emit("join-user-room", userId);
+        // Rejoin date room if we had one
+        if (currentDateRoomRef.current) {
+          socket.emit("join-date-room", currentDateRoomRef.current, userId);
+        }
+      });
+
+      socket.on("disconnect", () => {
+        console.log("Disconnected from WebSocket server");
+      });
     }
-
-    if (events.onTaskUpdated) {
-      socket.on("task:updated", events.onTaskUpdated);
-    }
-
-    if (events.onTaskDeleted) {
-      socket.on("task:deleted", events.onTaskDeleted);
-    }
-
-    if (events.onTasksReordered) {
-      socket.on("tasks:reordered", events.onTasksReordered);
-    }
-
-    socket.on("connect", () => {
-      console.log("Connected to WebSocket server");
-    });
-
-    socket.on("disconnect", () => {
-      console.log("Disconnected from WebSocket server");
-    });
 
     return () => {
-      socket.disconnect();
+      // Don't disconnect on unmount - keep connection alive
+      // socket.disconnect();
     };
-  }, [userId, events]);
+  }, [userId]); // Only depend on userId, not events
 
-  // Join date-specific room
-  const joinDateRoom = (date: string) => {
-    if (socketRef.current && userId) {
-      socketRef.current.emit("join-date-room", date, userId);
-    }
-  };
+  // Join date-specific room with proper room management
+  const joinDateRoom = useCallback(
+    (date: string) => {
+      if (socketRef.current && userId) {
+        // Leave current date room if we're in one
+        if (currentDateRoomRef.current && currentDateRoomRef.current !== date) {
+          console.log("Leaving old date room:", currentDateRoomRef.current);
+          socketRef.current.emit(
+            "leave-date-room",
+            currentDateRoomRef.current,
+            userId,
+          );
+        }
+
+        // Join new date room
+        console.log("Joining date room:", date);
+        socketRef.current.emit("join-date-room", date, userId);
+        currentDateRoomRef.current = date;
+      }
+    },
+    [userId],
+  );
 
   return {
     socket: socketRef.current,
