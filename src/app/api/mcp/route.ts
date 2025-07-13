@@ -11,6 +11,90 @@ import {
 } from "@/lib/websocket/server";
 
 /**
+ * Get today's date and time information for the caller's timezone.
+ */
+async function getTodaysDate(args: { timezone?: string }) {
+  try {
+    const { timezone } = args;
+    const now = new Date();
+
+    // Use provided timezone or default to UTC
+    const timeZone = timezone || "UTC";
+
+    // Format date in various useful formats
+    const dateInfo = {
+      iso: now.toISOString(),
+      date: now.toISOString().split("T")[0], // YYYY-MM-DD format
+      time: now.toISOString().split("T")[1].split(".")[0], // HH:MM:SS format
+      timestamp: now.getTime(),
+      timezone: timeZone,
+      localDate: timezone
+        ? new Intl.DateTimeFormat("en-CA", {
+            timeZone: timezone,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).format(now)
+        : now.toISOString().split("T")[0],
+      localTime: timezone
+        ? new Intl.DateTimeFormat("en-GB", {
+            timeZone: timezone,
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false,
+          }).format(now)
+        : now.toISOString().split("T")[1].split(".")[0],
+      localDateTime: timezone
+        ? new Intl.DateTimeFormat("en-CA", {
+            timeZone: timezone,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false,
+          })
+            .format(now)
+            .replace(", ", " ")
+        : now.toISOString().replace("T", " ").split(".")[0],
+      weekday: timezone
+        ? new Intl.DateTimeFormat("en-US", {
+            timeZone: timezone,
+            weekday: "long",
+          }).format(now)
+        : new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(now),
+      month: timezone
+        ? new Intl.DateTimeFormat("en-US", {
+            timeZone: timezone,
+            month: "long",
+          }).format(now)
+        : new Intl.DateTimeFormat("en-US", { month: "long" }).format(now),
+    };
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Current date and time information:\n\n${JSON.stringify(dateInfo, null, 2)}`,
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
+/**
  * List all tasks for a specific date for the authenticated user.
  */
 async function listTasks(args: { date: string }, userId: string) {
@@ -456,6 +540,22 @@ export async function POST(request: NextRequest) {
           result: {
             tools: [
               {
+                name: "todays_date",
+                description:
+                  "Get current date and time information in caller's timezone",
+                inputSchema: {
+                  type: "object",
+                  properties: {
+                    timezone: {
+                      type: "string",
+                      description:
+                        "IANA timezone name (e.g., 'America/New_York', 'Europe/London'). Defaults to UTC if not provided.",
+                    },
+                  },
+                  required: [],
+                },
+              },
+              {
                 name: "list_tasks",
                 description:
                   "List all tasks for a specific date (authenticated user)",
@@ -609,6 +709,9 @@ export async function POST(request: NextRequest) {
           // Execute tools directly based on their name
           let result;
           switch (toolName) {
+            case "todays_date":
+              result = await getTodaysDate(toolArgs);
+              break;
             case "list_tasks":
               result = await listTasks(toolArgs, user.userId);
               break;
