@@ -555,15 +555,13 @@ You can use Claude Desktop (or any compatible MCP client) with your MCP server. 
 
 Example -
 ```
-{
   "mcpServers": {
-    "my-mcp-server": 
+    "my-mcp-server": {
       "url": "http://localhost:3000/api/mcp",
       "headers": {
-        "Authorization": "Bearer mcp_e65c7e9633531ce5179161784a46ced09836e5c5426bd853a41bf72be142117a"
+        "Authorization": "Bearer mcp_token"
       }
     }
-  }
 }
 ```
 
