@@ -102,7 +102,6 @@ async function listTasks(args: { date: string }, userId: string) {
     const { date } = args;
     const tasks = await db
       .select({
-        id: TaskSchema.id,
         nanoId: TaskSchema.nanoId,
         title: TaskSchema.title,
         description: TaskSchema.description,
@@ -113,8 +112,6 @@ async function listTasks(args: { date: string }, userId: string) {
         timeBlock: TaskSchema.timeBlock,
         difficulty: TaskSchema.difficulty,
         tags: TaskSchema.tags,
-        createdAt: TaskSchema.createdAt,
-        updatedAt: TaskSchema.updatedAt,
       })
       .from(TaskSchema)
       .innerJoin(PlannerSchema, eq(TaskSchema.plannerId, PlannerSchema.id))
@@ -177,7 +174,7 @@ async function createTask(args: any, userId: string) {
         .returning();
     }
 
-    const [newTask] = await db
+    const [dbTask] = await db
       .insert(TaskSchema)
       .values({
         nanoId: nanoid(8),
@@ -210,18 +207,28 @@ async function createTask(args: any, userId: string) {
         updatedAt: TaskSchema.updatedAt,
       });
 
-    // Broadcast task creation to WebSocket clients
+    // Broadcast task creation to WebSocket clients (keep all fields for WebSocket)
     try {
-      broadcastTaskCreated(newTask as any, date, userId);
+      broadcastTaskCreated(dbTask as any, date, userId);
     } catch (error) {
       console.warn("Failed to broadcast task creation:", error);
     }
+
+    // Return only public fields to MCP client
+    const {
+      id,
+      plannerId,
+      userId: userIdField,
+      createdAt,
+      updatedAt,
+      ...publicTask
+    } = dbTask;
 
     return {
       content: [
         {
           type: "text",
-          text: `Task created successfully!\n\n${JSON.stringify(newTask, null, 2)}`,
+          text: `Task created successfully!\n\n${JSON.stringify(publicTask, null, 2)}`,
         },
       ],
     };
@@ -297,11 +304,21 @@ async function editTask(args: any, userId: string) {
       console.warn("Failed to broadcast task update:", error);
     }
 
+    // Return only public fields to MCP client
+    const {
+      id,
+      plannerId,
+      userId: userIdField,
+      createdAt,
+      updatedAt,
+      ...publicTask
+    } = updatedTask;
+
     return {
       content: [
         {
           type: "text",
-          text: `Task "${nanoId}" updated successfully!\n\n${JSON.stringify(updatedTask, null, 2)}`,
+          text: `Task "${nanoId}" updated successfully!\n\n${JSON.stringify(publicTask, null, 2)}`,
         },
       ],
     };
@@ -441,11 +458,25 @@ async function markTaskComplete(args: any, userId: string) {
       console.warn("Failed to broadcast task update:", error);
     }
 
+    // Return only public fields to MCP client
+    const publicTask = {
+      nanoId: updatedTask.nanoId,
+      title: updatedTask.title,
+      description: updatedTask.description,
+      isCompleted: updatedTask.isCompleted,
+      quadrant: updatedTask.quadrant,
+      priority: updatedTask.priority,
+      timeRequired: updatedTask.timeRequired,
+      timeBlock: updatedTask.timeBlock,
+      difficulty: updatedTask.difficulty,
+      tags: updatedTask.tags,
+    };
+
     return {
       content: [
         {
           type: "text",
-          text: `Task "${nanoId}" marked as ${completed ? "completed" : "incomplete"} successfully!\n\n${JSON.stringify(updatedTask, null, 2)}`,
+          text: `Task "${nanoId}" marked as ${completed ? "completed" : "incomplete"} successfully!\n\n${JSON.stringify(publicTask, null, 2)}`,
         },
       ],
     };
@@ -647,14 +678,31 @@ export async function POST(request: NextRequest) {
                             "not-urgent-not-important",
                           ],
                         },
-                        priority: { type: "number" },
-                        timeRequired: { type: "string" },
-                        timeBlock: { type: "string" },
+                        priority: {
+                          type: "number",
+                          description: "Priority order within quadrant",
+                        },
+                        timeRequired: {
+                          type: "string",
+                          description:
+                            "Estimated time required (e.g., '2 hours', '30 minutes')",
+                        },
+                        timeBlock: {
+                          type: "string",
+                          description:
+                            "Planned time block (e.g., '9-11 AM', '2-3 PM')",
+                        },
                         difficulty: {
                           type: "string",
                           enum: ["easy", "medium", "hard"],
+                          description: "Task difficulty level",
                         },
-                        tags: { type: "array", items: { type: "string" } },
+                        tags: {
+                          type: "array",
+                          items: { type: "string" },
+                          description:
+                            "Task tags (e.g., ['work', 'urgent'], ['personal', 'health'])",
+                        },
                       },
                       description: "Fields to update",
                     },
@@ -707,7 +755,7 @@ export async function POST(request: NextRequest) {
           const { name: toolName, arguments: toolArgs } = params;
 
           // Execute tools directly based on their name
-          let result;
+          let result: any;
           switch (toolName) {
             case "todays_date":
               result = await getTodaysDate(toolArgs);
